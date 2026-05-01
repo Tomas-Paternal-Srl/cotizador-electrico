@@ -573,10 +573,29 @@ curva 22mm x 50"></textarea>
     btn.textContent = 'Procesando...';
     setStatus('La IA está analizando el pedido...', true);
 
-    // Preparar catálogo: mandamos hasta 150 filas para no exceder tokens
-    const catalogoStr = catalogData.length > 0
-      ? catalogData.slice(0, 150).map(r => JSON.stringify(r)).join('\n')
-      : 'Sin catálogo cargado. Generá precios de ejemplo realistas en ARS para materiales eléctricos.';
+    // Filtrar catálogo por palabras clave del pedido
+    let catalogoStr = 'Sin catálogo cargado. Generá precios de ejemplo realistas en ARS para materiales eléctricos.';
+    if (catalogData.length > 0) {
+      const lineasPedido = pedidoRaw.toLowerCase().split('\n');
+      const stopwords = ['x','de','la','el','un','una','por','con','sin','para','unidades','unidad','rollo','rollos','metros','metro','mts','mt'];
+      const keywords = new Set();
+      lineasPedido.forEach(linea => {
+        linea.split(/\s+/).forEach(p => {
+          p = p.replace(/[^a-záéíóúñ]/gi,'').toLowerCase();
+          if (p.length >= 3 && !stopwords.includes(p)) keywords.add(p);
+        });
+      });
+      const synMap = {'cupla':'union','cano':'corrugado','termica':'llave','diferencial':'disyuntor','grampa':'grampa','grapa':'grampa','curva':'curva','corrugado':'corrugado','union':'union'};
+      const expandedKw = new Set(keywords);
+      keywords.forEach(k => { if(synMap[k]) expandedKw.add(synMap[k]); });
+      const filtered = catalogData.filter(row => {
+        const descrip = Object.values(row).join(' ').toLowerCase();
+        for (const kw of expandedKw) { if (descrip.includes(kw)) return true; }
+        return false;
+      });
+      const usedRows = filtered.length > 0 ? filtered : catalogData.slice(0, 200);
+      catalogoStr = usedRows.slice(0, 400).map(r => JSON.stringify(r)).join('\n');
+    }
 
     try {
       const resp = await fetch('/api/cotizar', {
