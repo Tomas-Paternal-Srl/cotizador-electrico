@@ -1,4 +1,9 @@
-import { neon } from '@neondatabase/serverless';
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -10,7 +15,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Se esperaba array de terminos' });
   }
 
-  const sql = neon(process.env.DATABASE_URL);
+  const client = await pool.connect();
 
   try {
     const resultados = [];
@@ -24,16 +29,13 @@ export default async function handler(req, res) {
 
       if (palabras.length === 0) continue;
 
-      // Buscar productos que contengan alguna de las palabras
       const rows = new Map();
       for (const palabra of palabras) {
-        const r = await sql`
-          SELECT descrip, precio, marca
-          FROM catalogo
-          WHERE search_text ILIKE ${'%' + palabra + '%'}
-          LIMIT 25
-        `;
-        for (const row of r) {
+        const r = await client.query(
+          `SELECT descrip, precio, marca FROM catalogo WHERE search_text ILIKE $1 LIMIT 25`,
+          [`%${palabra}%`]
+        );
+        for (const row of r.rows) {
           if (!rows.has(row.descrip)) {
             let score = 0;
             const d = row.descrip.toLowerCase();
@@ -50,9 +52,11 @@ export default async function handler(req, res) {
       resultados.push({ termino, productos: top });
     }
 
+    client.release();
     return res.status(200).json({ resultados });
 
   } catch (err) {
+    client.release();
     return res.status(500).json({ error: err.message });
   }
 }
