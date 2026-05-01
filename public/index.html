@@ -571,80 +571,32 @@ curva 22mm x 50"></textarea>
     const btn = document.getElementById('btn-cotizar');
     btn.disabled = true;
     btn.textContent = 'Procesando...';
-    setStatus('Buscando productos en el catálogo...', true);
+    setStatus('Preparando catálogo...', true);
 
-    // ── Filtro inteligente por ítem del pedido ──
-    // Para cada línea del pedido, busca los mejores matches en el catálogo
+    // Mandar solo descrip + precio + marca (columnas B, C, F)
+    // Así entra el catálogo completo sin filtros
     let catalogoStr;
-
     if (catalogData.length === 0) {
-      catalogoStr = 'Sin catálogo cargado. Generá precios de ejemplo realistas en ARS para materiales eléctricos.';
+      catalogoStr = 'Sin catálogo. Usá precios de ejemplo realistas en ARS.';
     } else {
-      const lineas = pedidoRaw.split('\n').filter(l => l.trim());
-      const rowsSeleccionadas = new Map(); // key=numart, value=row
+      // Detectar nombres de columnas automáticamente
+      const keys = Object.keys(catalogData[0]);
+      // Buscar columna descripcion (col B = índice 1)
+      const colDesc  = keys[1] || keys.find(k => k.toLowerCase().includes('descr')) || keys[0];
+      // Buscar columna precio (col C = índice 2)
+      const colPrecio = keys[2] || keys.find(k => k.toLowerCase().includes('venta') || k.toLowerCase().includes('precio')) || keys[2];
+      // Buscar columna marca (col F = índice 5)
+      const colMarca = keys[5] || keys.find(k => k.toLowerCase().includes('marca')) || keys[5];
 
-      // Sinónimos para expandir búsqueda
-      const sinonimosMap = {
-        'cupla': ['union','cupla'],
-        'cano': ['corrugado','caño'],
-        'caño': ['corrugado','caño'],
-        'corrugado': ['corrugado','caño corrugado'],
-        'termica': ['termomagnetica','termomag'],
-        'térmica': ['termomagnetica','termomag'],
-        'diferencial': ['diferencial','disyuntor diferencial'],
-        'grampa': ['grampa','grapa'],
-        'grapa': ['grampa','grapa'],
-        'toma': ['toma','tomacorriente'],
-        'tomacorriente': ['toma','tomacorriente'],
-        'curva': ['curva','codo'],
-        'codo': ['curva','codo'],
-        'union': ['union','unión'],
-        'bandeja': ['bandeja'],
-        'soporte': ['soporte'],
-        'varilla': ['varilla'],
-        'bastidor': ['bastidor'],
-        'tapa': ['tapa'],
-        'cable': ['cable'],
-        'grampa': ['grampa'],
-      };
+      // Armar CSV comprimido: descripcion|precio|marca
+      const header = 'descripcion|precio|marca';
+      const rows = catalogData.map(r =>
+        `${r[colDesc]||''}|${r[colPrecio]||''}|${r[colMarca]||''}`
+      ).join('\n');
+      catalogoStr = header + '\n' + rows;
 
-      for (const linea of lineas) {
-        // Extraer palabras clave de la línea (ignorar números y palabras cortas)
-        const stopwords = new Set(['de','la','el','un','una','por','con','sin','para','x','unidades','unidad','rollo','rollos','metros','metro','mts','mt','m','a','y']);
-        const palabras = linea.toLowerCase()
-          .replace(/[^a-záéíóúñ\s]/gi, ' ')
-          .split(/\s+/)
-          .filter(p => p.length >= 3 && !stopwords.has(p));
-
-        // Expandir con sinónimos
-        const busquedas = new Set();
-        for (const p of palabras) {
-          busquedas.add(p);
-          if (sinonimosMap[p]) sinonimosMap[p].forEach(s => busquedas.add(s));
-        }
-
-        // Buscar en catálogo: scoring por cuántas palabras matchean
-        const scored = [];
-        for (const row of catalogData) {
-          const descrip = (row.descrip || row.DESCRIP || '').toString().toLowerCase();
-          let score = 0;
-          for (const kw of busquedas) {
-            if (descrip.includes(kw)) score++;
-          }
-          if (score > 0) scored.push({ row, score });
-        }
-
-        // Ordenar por score y tomar los top 20 por línea
-        scored.sort((a, b) => b.score - a.score);
-        scored.slice(0, 20).forEach(({ row }) => {
-          const key = row.numart || row.NUMART || JSON.stringify(row).slice(0,50);
-          rowsSeleccionadas.set(key, row);
-        });
-      }
-
-      const filas = Array.from(rowsSeleccionadas.values());
-      catalogoStr = filas.map(r => JSON.stringify(r)).join('\n');
-      setStatus(`Encontré ${filas.length} productos relevantes. Cotizando con IA...`, true);
+      const tokens = Math.round(catalogoStr.length / 4);
+      setStatus(`Catálogo listo (${catalogData.length} productos, ~${tokens.toLocaleString()} tokens). Cotizando con IA...`, true);
     }
 
     const instrucciones = document.getElementById('instrucciones').value.trim();
