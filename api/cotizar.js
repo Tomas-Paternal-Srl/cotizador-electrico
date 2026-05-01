@@ -58,7 +58,7 @@ Respondé ÚNICAMENTE con JSON válido, sin texto antes ni después, sin backtic
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
-        max_tokens: 4000,
+        max_tokens: 8000,
         messages: [{ role: 'user', content: prompt }]
       })
     });
