@@ -445,6 +445,17 @@
       💡 Cuando cotizás y confirmás un match dudoso, se guarda acá automáticamente.</div>
     </div>
 
+    <!-- Instrucciones de negocio -->
+    <div class="card">
+      <div class="card-title"><span class="num">3</span> Instrucciones de negocio</div>
+      <textarea id="instrucciones" style="min-height:90px;" placeholder="Reglas que la IA siempre va a seguir. Ejemplos:
+- Si no aclara marca en térmicas, cotizar Chint
+- Si no aclara tipo de corrugado, cotizar liviano
+- Si piden cable sin sección, cotizar 2.5mm
+- Precios sin IVA siempre"></textarea>
+      <div class="hint">Estas reglas se aplican en todas las cotizaciones automáticamente.</div>
+    </div>
+
     <!-- Botón cotizar -->
     <button class="btn btn-primary" id="btn-cotizar" onclick="cotizar()">
       Cotizar con IA ↗
@@ -574,7 +585,8 @@ curva 22mm x 50"></textarea>
         body: JSON.stringify({
           pedido: pedidoRaw,
           catalogo: catalogoStr,
-          sinonimos: synonyms
+          sinonimos: synonyms,
+          instrucciones: document.getElementById('instrucciones').value.trim()
         })
       });
 
