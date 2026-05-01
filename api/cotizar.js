@@ -4,7 +4,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  const { pedido, catalogo, sinonimos } = req.body;
+  const { pedido, catalogo, sinonimos, instrucciones } = req.body;
 
   if (!pedido || !catalogo) {
     return res.status(400).json({ error: 'Faltan datos: pedido y catalogo son requeridos' });
@@ -19,6 +19,10 @@ export default async function handler(req, res) {
     ? sinonimos.map(s => `${s[0]} = ${s[1]}`).join(', ')
     : 'ninguno extra cargado';
 
+  const instrStr = instrucciones && instrucciones.trim()
+    ? instrucciones.trim()
+    : 'ninguna instrucción especial';
+
   const prompt = `Sos un cotizador experto en materiales eléctricos argentinos con amplio conocimiento del rubro.
 
 CATÁLOGO DE PRECIOS DISPONIBLE:
@@ -28,6 +32,9 @@ SINÓNIMOS ESPECÍFICOS DEL CLIENTE: ${sinStr}
 
 PEDIDO DEL CLIENTE:
 ${pedido}
+
+REGLAS DE NEGOCIO (seguir siempre):
+${instrStr}
 
 INSTRUCCIONES:
 - Para cada línea del pedido, identificá el producto, cantidad y unidad
