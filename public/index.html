@@ -615,7 +615,23 @@ curva 22mm x 50"></textarea>
       });
 
       const usedRows = filtered.length > 0 ? filtered : catalogData.slice(0, 200);
-      catalogoStr = usedRows.slice(0, 500).map(r => JSON.stringify(r)).join('\n');
+      // Tomar hasta 15 filas por cada keyword para no exceder tokens
+      const filasPorKw = [];
+      for (const kw of busquedas) {
+        const match = catalogData.filter(row => {
+          const descrip = (row.descrip || row.DESCRIP || Object.values(row)[1] || '').toString().toLowerCase();
+          return descrip.includes(kw);
+        }).slice(0, 15);
+        match.forEach(r => filasPorKw.push(r));
+      }
+      // Deduplicar por codigo
+      const seen = new Set();
+      const deduped = filasPorKw.filter(r => {
+        const key = r.numart || r.NUMART || JSON.stringify(r);
+        if (seen.has(key)) return false;
+        seen.add(key); return true;
+      });
+      catalogoStr = deduped.slice(0, 120).map(r => JSON.stringify(r)).join('\n');
     }
 
     try {
