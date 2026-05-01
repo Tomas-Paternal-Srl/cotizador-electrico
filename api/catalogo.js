@@ -1,31 +1,37 @@
-import { neon } from '@neondatabase/serverless';
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 export default async function handler(req, res) {
-  const sql = neon(process.env.DATABASE_URL);
-
-  // GET - verificar cuántos productos hay
+  const client = await pool.connect();
+  
   if (req.method === 'GET') {
     try {
-      const result = await sql`SELECT COUNT(*) as total FROM catalogo`;
-      return res.status(200).json({ total: parseInt(result[0].total) });
+      const result = await client.query('SELECT COUNT(*) as total FROM catalogo');
+      client.release();
+      return res.status(200).json({ total: parseInt(result.rows[0].total) });
     } catch (err) {
+      client.release();
       return res.status(200).json({ total: 0 });
     }
   }
 
-  // POST - cargar catálogo
   if (req.method !== 'POST') {
+    client.release();
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
   const { productos } = req.body;
   if (!productos || !Array.isArray(productos)) {
+    client.release();
     return res.status(400).json({ error: 'Se esperaba array de productos' });
   }
 
   try {
-    // Crear tabla
-    await sql`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS catalogo (
         id SERIAL PRIMARY KEY,
         descrip TEXT NOT NULL,
@@ -33,29 +39,23 @@ export default async function handler(req, res) {
         marca TEXT,
         search_text TEXT
       )
-    `;
+    `);
 
-    // Borrar anterior
-    await sql`TRUNCATE TABLE catalogo`;
+    await client.query('TRUNCATE TABLE catalogo');
 
-    // Insertar en lotes de 100
-    let insertados = 0;
-    const lote = 100;
-    for (let i = 0; i < productos.length; i += lote) {
-      const chunk = productos.slice(i, i + lote);
-      for (const p of chunk) {
-        const searchText = `${p.descrip} ${p.marca}`.toLowerCase();
-        await sql`
-          INSERT INTO catalogo (descrip, precio, marca, search_text)
-          VALUES (${p.descrip}, ${p.precio}, ${p.marca}, ${searchText})
-        `;
-        insertados++;
-      }
+    for (const p of productos) {
+      const searchText = `${p.descrip} ${p.marca}`.toLowerCase();
+      await client.query(
+        'INSERT INTO catalogo (descrip, precio, marca, search_text) VALUES ($1, $2, $3, $4)',
+        [p.descrip, p.precio, p.marca, searchText]
+      );
     }
 
-    return res.status(200).json({ ok: true, insertados, mensaje: `Catálogo actualizado con ${insertados} productos` });
+    client.release();
+    return res.status(200).json({ ok: true, insertados: productos.length, mensaje: `Catálogo actualizado con ${productos.length} productos` });
 
   } catch (err) {
+    client.release();
     return res.status(500).json({ error: err.message });
   }
 }
