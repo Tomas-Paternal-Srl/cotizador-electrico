@@ -571,68 +571,83 @@ curva 22mm x 50"></textarea>
     const btn = document.getElementById('btn-cotizar');
     btn.disabled = true;
     btn.textContent = 'Procesando...';
-    setStatus('La IA está analizando el pedido...', true);
+    setStatus('Buscando productos en el catálogo...', true);
 
-    // Filtrar catálogo por palabras clave del pedido
-    let catalogoStr = 'Sin catálogo cargado. Generá precios de ejemplo realistas en ARS para materiales eléctricos.';
-    if (catalogData.length > 0) {
-      // Extraer palabras de 3+ letras del pedido
-      const palabrasPedido = pedidoRaw.toLowerCase()
-        .replace(/[^a-záéíóúñ ]/gi, ' ')
-        .split(' ')
-        .filter(p => p.length >= 3);
+    // ── Filtro inteligente por ítem del pedido ──
+    // Para cada línea del pedido, busca los mejores matches en el catálogo
+    let catalogoStr;
 
-      // Expandir con sinónimos básicos
-      const sinonimosBase = {
+    if (catalogData.length === 0) {
+      catalogoStr = 'Sin catálogo cargado. Generá precios de ejemplo realistas en ARS para materiales eléctricos.';
+    } else {
+      const lineas = pedidoRaw.split('\n').filter(l => l.trim());
+      const rowsSeleccionadas = new Map(); // key=numart, value=row
+
+      // Sinónimos para expandir búsqueda
+      const sinonimosMap = {
+        'cupla': ['union','cupla'],
+        'cano': ['corrugado','caño'],
+        'caño': ['corrugado','caño'],
         'corrugado': ['corrugado','caño corrugado'],
-        'union': ['union','unión'],
-        'cupla': ['union','cupla','unión'],
-        'curva': ['curva','codo'],
+        'termica': ['termomagnetica','termomag'],
+        'térmica': ['termomagnetica','termomag'],
+        'diferencial': ['diferencial','disyuntor diferencial'],
         'grampa': ['grampa','grapa'],
         'grapa': ['grampa','grapa'],
-        'termica': ['termica','térmica','llave','disyuntor','termomag'],
-        'diferencial': ['diferencial','disyuntor'],
-        'tomacorriente': ['tomacorriente','toma'],
-        'cano': ['corrugado','caño'],
-        'cable': ['cable'],
+        'toma': ['toma','tomacorriente'],
+        'tomacorriente': ['toma','tomacorriente'],
+        'curva': ['curva','codo'],
+        'codo': ['curva','codo'],
+        'union': ['union','unión'],
         'bandeja': ['bandeja'],
         'soporte': ['soporte'],
-        'tapa': ['tapa']
+        'varilla': ['varilla'],
+        'bastidor': ['bastidor'],
+        'tapa': ['tapa'],
+        'cable': ['cable'],
+        'grampa': ['grampa'],
       };
 
-      const busquedas = new Set(palabrasPedido);
-      palabrasPedido.forEach(p => {
-        if (sinonimosBase[p]) sinonimosBase[p].forEach(s => busquedas.add(s));
-      });
+      for (const linea of lineas) {
+        // Extraer palabras clave de la línea (ignorar números y palabras cortas)
+        const stopwords = new Set(['de','la','el','un','una','por','con','sin','para','x','unidades','unidad','rollo','rollos','metros','metro','mts','mt','m','a','y']);
+        const palabras = linea.toLowerCase()
+          .replace(/[^a-záéíóúñ\s]/gi, ' ')
+          .split(/\s+/)
+          .filter(p => p.length >= 3 && !stopwords.has(p));
 
-      // Filtrar filas donde la descripción contenga alguna palabra buscada
-      const filtered = catalogData.filter(row => {
-        const descrip = (row.descrip || row.DESCRIP || Object.values(row)[1] || '').toString().toLowerCase();
-        for (const kw of busquedas) {
-          if (descrip.includes(kw)) return true;
+        // Expandir con sinónimos
+        const busquedas = new Set();
+        for (const p of palabras) {
+          busquedas.add(p);
+          if (sinonimosMap[p]) sinonimosMap[p].forEach(s => busquedas.add(s));
         }
-        return false;
-      });
 
-      const usedRows = filtered.length > 0 ? filtered : catalogData.slice(0, 200);
-      // Tomar hasta 15 filas por cada keyword para no exceder tokens
-      const filasPorKw = [];
-      for (const kw of busquedas) {
-        const match = catalogData.filter(row => {
-          const descrip = (row.descrip || row.DESCRIP || Object.values(row)[1] || '').toString().toLowerCase();
-          return descrip.includes(kw);
-        }).slice(0, 15);
-        match.forEach(r => filasPorKw.push(r));
+        // Buscar en catálogo: scoring por cuántas palabras matchean
+        const scored = [];
+        for (const row of catalogData) {
+          const descrip = (row.descrip || row.DESCRIP || '').toString().toLowerCase();
+          let score = 0;
+          for (const kw of busquedas) {
+            if (descrip.includes(kw)) score++;
+          }
+          if (score > 0) scored.push({ row, score });
+        }
+
+        // Ordenar por score y tomar los top 20 por línea
+        scored.sort((a, b) => b.score - a.score);
+        scored.slice(0, 20).forEach(({ row }) => {
+          const key = row.numart || row.NUMART || JSON.stringify(row).slice(0,50);
+          rowsSeleccionadas.set(key, row);
+        });
       }
-      // Deduplicar por codigo
-      const seen = new Set();
-      const deduped = filasPorKw.filter(r => {
-        const key = r.numart || r.NUMART || JSON.stringify(r);
-        if (seen.has(key)) return false;
-        seen.add(key); return true;
-      });
-      catalogoStr = deduped.slice(0, 120).map(r => JSON.stringify(r)).join('\n');
+
+      const filas = Array.from(rowsSeleccionadas.values());
+      catalogoStr = filas.map(r => JSON.stringify(r)).join('\n');
+      setStatus(`Encontré ${filas.length} productos relevantes. Cotizando con IA...`, true);
     }
+
+    const instrucciones = document.getElementById('instrucciones').value.trim();
 
     try {
       const resp = await fetch('/api/cotizar', {
@@ -642,12 +657,11 @@ curva 22mm x 50"></textarea>
           pedido: pedidoRaw,
           catalogo: catalogoStr,
           sinonimos: synonyms,
-          instrucciones: document.getElementById('instrucciones').value.trim()
+          instrucciones: instrucciones
         })
       });
 
       const data = await resp.json();
-
       if (data.error) throw new Error(data.error);
 
       resultItems = data.items;
