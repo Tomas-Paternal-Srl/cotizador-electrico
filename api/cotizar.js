@@ -23,30 +23,22 @@ export default async function handler(req, res) {
     ? instrucciones.trim()
     : 'ninguna instrucción especial';
 
-  const prompt = `Sos un cotizador experto en materiales eléctricos argentinos con amplio conocimiento del rubro.
+  const prompt = `Cotizador eléctrico argentino. El catálogo tiene formato: descripcion|precio|marca
 
-CATÁLOGO DE PRECIOS DISPONIBLE:
+CATÁLOGO:
 ${catalogo}
 
-SINÓNIMOS ESPECÍFICOS DEL CLIENTE: ${sinStr}
+SINÓNIMOS: ${sinStr}
+REGLAS: ${instrStr}
 
-PEDIDO DEL CLIENTE:
+PEDIDO:
 ${pedido}
 
-REGLAS DE NEGOCIO (seguir siempre):
-${instrStr}
+Sinónimos comunes: cupla=union, cano=corrugado, termica=termomag, grampa=grapa, codo=curva, toma=tomacorriente.
+Ignorá tildes y mayúsculas. Aplicá las reglas de negocio para elegir marca cuando corresponda.
 
-INSTRUCCIONES:
-- Para cada línea del pedido, identificá el producto, cantidad y unidad
-- Buscá el mejor match en el catálogo usando tu conocimiento del rubro eléctrico argentino
-- Usá sinónimos conocidos: cupla=unión, cano=caño, térmica=disyuntor=termomagnética, grampa=grapa, corrugado=caño corrugado, codo=curva, tomacorriente=toma=enchufe, etc.
-- Ignorá tildes, mayúsculas y variaciones de escritura
-- Si hay varios productos similares, elegí el más probable según el contexto
-- Asigná confianza ALTA si el match es claro, MEDIA si usaste sinónimo o aproximación, BAJA si no encontraste match bueno
-- En "nota" explicá brevemente si usaste sinónimo o por qué dudás
-
-Respondé ÚNICAMENTE con JSON válido, sin texto antes ni después, sin backticks:
-{"items":[{"pedido":"texto original del pedido","match":"descripción exacta del producto en el catálogo","codigo":"código/numart del producto","cantidad":1,"unidad":"unidad","precio_unit":0,"subtotal":0,"confianza":"alta|media|baja","nota":"explicación si aplica"}]}`;
+JSON sin texto extra ni backticks:
+{"items":[{"pedido":"linea original","match":"descripcion del catalogo","cantidad":1,"unidad":"u","precio_unit":0,"subtotal":0,"confianza":"alta|media|baja","nota":""}]}`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
