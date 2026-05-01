@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cotizador Eléctrico</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --bg2: #1a1a1a;
+      --bg3: #242424;
+      --border: #2e2e2e;
+      --border2: #3a3a3a;
+      --text: #f0f0f0;
+      --text2: #999;
+      --text3: #555;
+      --accent: #f0c040;
+      --accent2: #c49a20;
+      --green: #4caf7d;
+      --green-bg: #0d2018;
+      --orange: #e08a30;
+      --orange-bg: #251808;
+      --red: #e05050;
+      --red-bg: #200808;
+      --radius: 10px;
+      --font: 'DM Sans', sans-serif;
+      --mono: 'DM Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    header span {
+      font-size: 12px;
+      color: var(--text3);
+      font-family: var(--mono);
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px 24px;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .sidebar { display: flex; flex-direction: column; gap: 16px; }
+    .main { display: flex; flex-direction: column; gap: 16px; }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+
+    .card-title {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title .num {
+      width: 20px;
+      height: 20px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--text2);
+    }
+
+    .upload-zone {
+      border: 1px dashed var(--border2);
+      border-radius: 8px;
+      padding: 20px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .upload-zone:hover {
+      border-color: var(--accent);
+      background: rgba(240,192,64,0.04);
+    }
+
+    .upload-zone .icon { font-size: 24px; margin-bottom: 8px; }
+    .upload-zone p { font-size: 13px; color: var(--text2); }
+    .upload-zone small { font-size: 11px; color: var(--text3); margin-top: 4px; display: block; }
+    #file-input { display: none; }
+
+    .file-ok {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--green);
+      font-weight: 500;
+    }
+
+    .badge-count {
+      font-size: 11px;
+      background: var(--green-bg);
+      color: var(--green);
+      border: 1px solid rgba(76,175,125,0.2);
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-family: var(--mono);
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 13px;
+      font-family: var(--mono);
+      color: var(--text);
+      resize: vertical;
+      min-height: 160px;
+      line-height: 1.6;
+      transition: border-color 0.2s;
+    }
+
+    textarea::placeholder { color: var(--text3); }
+    textarea:focus { outline: none; border-color: var(--border2); }
+
+    .hint {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    .syn-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+      min-height: 28px;
+    }
+
+    .syn-tag {
+      font-size: 11px;
+      font-family: var(--mono);
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      padding: 3px 10px 3px 10px;
+      color: var(--text2);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .syn-del {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text3);
+      font-size: 14px;
+      line-height: 1;
+      padding: 0;
+      transition: color 0.15s;
+    }
+    .syn-del:hover { color: var(--red); }
+
+    .row { display: flex; gap: 8px; }
+
+    input[type=text] {
+      flex: 1;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-family: var(--mono);
+      color: var(--text);
+      transition: border-color 0.2s;
+    }
+    input[type=text]:focus { outline: none; border-color: var(--border2); }
+    input[type=text]::placeholder { color: var(--text3); }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border2);
+      background: var(--bg3);
+      color: var(--text2);
+      transition: all 0.15s;
+      font-family: var(--font);
+      white-space: nowrap;
+    }
+    .btn:hover:not(:disabled) { background: var(--border); color: var(--text); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .btn-primary {
+      width: 100%;
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      background: var(--accent);
+      color: #0f0f0f;
+      border-color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: #ffd55a;
+      border-color: #ffd55a;
+      color: #0f0f0f;
+    }
+
+    .status {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text2);
+      padding: 10px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--border2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 10px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .td-pedido {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    .td-match { font-weight: 500; }
+
+    .td-note {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 3px;
+      font-style: italic;
+    }
+
+    .td-precio {
+      font-family: var(--mono);
+      font-size: 13px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .b-alta { background: var(--green-bg); color: var(--green); border: 1px solid rgba(76,175,125,0.2); }
+    .b-media { background: var(--orange-bg); color: var(--orange); border: 1px solid rgba(224,138,48,0.2); }
+    .b-baja { background: var(--red-bg); color: var(--red); border: 1px solid rgba(224,80,80,0.2); }
+
+    .confirm-btn {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid var(--border2);
+      background: none;
+      color: var(--text3);
+      transition: all 0.15s;
+      font-family: var(--font);
+    }
+    .confirm-btn:hover { border-color: var(--green); color: var(--green); }
+    .confirm-btn.confirmed { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+
+    .total-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 10px 4px;
+      border-top: 1px solid var(--border);
+      margin-top: 4px;
+    }
+
+    .total-label { font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .total-val {
+      font-size: 24px;
+      font-weight: 600;
+      font-family: var(--mono);
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text3);
+    }
+
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
+    .empty-state p { font-size: 13px; }
+
+    @media (max-width: 768px) {
+      .container { grid-template-columns: 1fr; }
+      header { padding: 14px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡</div>
+  <div>
+    <h1>Cotizador Eléctrico</h1>
+    <span>IA · Matching inteligente de materiales</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Lista de precios -->
+    <div class="card">
+      <div class="card-title"><span class="num">1</span> Lista de precios</div>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+        <input type="file" id="file-input" accept=".xlsx,.xls,.csv">
+        <div id="file-label">
+          <div class="icon">📂</div>
+          <p>Subí tu Excel de precios</p>
+          <small>.xlsx · .xls · .csv</small>
+        </div>
+      </div>
+      <div class="hint" id="cols-hint"></div>
+    </div>
+
+    <!-- Sinónimos -->
+    <div class="card">
+      <div class="card-title"><span class="num">2</span> Sinónimos aprendidos</div>
+      <div class="syn-wrap" id="syn-wrap"></div>
+      <div class="row">
+        <input type="text" id="syn-input" placeholder="ej: ficha = conector">
+        <button class="btn" onclick="addSyn()">+ Agregar</button>
+      </div>
+      <div class="hint">La IA ya conoce los sinónimos comunes del rubro. Agregá los específicos de tus clientes.<br><br>
+      💡 Cuando cotizás y confirmás un match dudoso, se guarda acá automáticamente.</div>
+    </div>
+
+    <!-- Botón cotizar -->
+    <button class="btn btn-primary" id="btn-cotizar" onclick="cotizar()">
+      Cotizar con IA ↗
+    </button>
+    <div class="status" id="status" style="display:none;"></div>
+
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- Pedido -->
+    <div class="card">
+      <div class="card-title"><span class="num">3</span> Pedido del cliente</div>
+      <textarea id="pedido" placeholder="Pegá el pedido acá, uno por línea. Ejemplos:
+union 20mm x 30
+cupla 3/4 x 5
+corrugado 3/4 x 2 rollos
+llave termica 2x16A x 2
+grampa pvc 20mm x 15
+curva 22mm x 50"></textarea>
+      <div class="hint">Escribilo tal cual te lo manda el cliente. La IA se encarga de interpretar.</div>
+    </div>
+
+    <!-- Resultado -->
+    <div class="card" id="result-card">
+      <div class="empty-state">
+        <div class="icon">📋</div>
+        <p>La cotización aparecerá acá</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ─── Estado ───────────────────────────────────────────────
+  let catalogData = [];
+  let synonyms = [];
+  let resultItems = [];
+
+  // ─── Sinónimos ────────────────────────────────────────────
+  function renderSyns() {
+    const wrap = document.getElementById('syn-wrap');
+    if (synonyms.length === 0) {
+      wrap.innerHTML = '<span style="font-size:11px;color:var(--text3)">Ninguno cargado aún — se agregan al confirmar matches</span>';
+      return;
+    }
+    wrap.innerHTML = synonyms.map((s, i) =>
+      `<span class="syn-tag">${s[0]} = ${s[1]}<button class="syn-del" onclick="removeSyn(${i})">×</button></span>`
+    ).join('');
+  }
+
+  function addSyn(a, b) {
+    if (a && b) {
+      synonyms.push([a.toLowerCase().trim(), b.toLowerCase().trim()]);
+      renderSyns();
+      return;
+    }
+    const val = document.getElementById('syn-input').value.trim();
+    if (!val.includes('=')) return;
+    const parts = val.split('=').map(x => x.trim().toLowerCase());
+    if (parts.length === 2 && parts[0] && parts[1]) {
+      // Evitar duplicados
+      const exists = synonyms.some(s => s[0] === parts[0] && s[1] === parts[1]);
+      if (!exists) { synonyms.push(parts); renderSyns(); }
+      document.getElementById('syn-input').value = '';
+    }
+  }
+
+  function removeSyn(i) { synonyms.splice(i, 1); renderSyns(); }
+
+  document.getElementById('syn-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addSyn();
+  });
+
+  renderSyns();
+
+  // ─── Carga de archivo ─────────────────────────────────────
+  document.getElementById('file-input').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        catalogData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        const cols = catalogData.length > 0 ? Object.keys(catalogData[0]).join(' · ') : '';
+
+        document.getElementById('file-label').innerHTML = `
+          <div class="file-ok">✓ ${file.name}</div>
+          <span class="badge-count">${catalogData.length.toLocaleString('es-AR')} productos</span>
+        `;
+        document.getElementById('cols-hint').innerHTML =
+          `<span style="color:var(--text3)">Columnas: ${cols}</span>`;
+
+      } catch (err) {
+        document.getElementById('file-label').innerHTML =
+          '<span style="color:var(--red)">Error al leer el archivo</span>';
+      }
+    };
+    reader.readAsBinaryString(file);
+  });
+
+  // ─── Cotizar ──────────────────────────────────────────────
+  async function cotizar() {
+    const pedidoRaw = document.getElementById('pedido').value.trim();
+    if (!pedidoRaw) { setStatus('Ingresá el pedido primero.', false); return; }
+
+    const btn = document.getElementById('btn-cotizar');
+    btn.disabled = true;
+    btn.textContent = 'Procesando...';
+    setStatus('La IA está analizando el pedido...', true);
+
+    // Preparar catálogo: mandamos hasta 150 filas para no exceder tokens
+    const catalogoStr = catalogData.length > 0
+      ? catalogData.slice(0, 150).map(r => JSON.stringify(r)).join('\n')
+      : 'Sin catálogo cargado. Generá precios de ejemplo realistas en ARS para materiales eléctricos.';
+
+    try {
+      const resp = await fetch('/api/cotizar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pedido: pedidoRaw,
+          catalogo: catalogoStr,
+          sinonimos: synonyms
+        })
+      });
+
+      const data = await resp.json();
+
+      if (data.error) throw new Error(data.error);
+
+      resultItems = data.items;
+      mostrarResultado(data.items);
+      setStatus('', false);
+
+    } catch (err) {
+      setStatus('Error: ' + err.message, false);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Cotizar con IA ↗';
+  }
+
+  // ─── Mostrar resultado ────────────────────────────────────
+  function mostrarResultado(items) {
+    let total = 0;
+    const card = document.getElementById('result-card');
+
+    let html = `
+      <div class="result-header">
+        <div class="card-title" style="margin:0"><span class="num">✓</span> Cotización generada</div>
+        <button class="btn" onclick="descargar()">↓ Descargar Excel</button>
+      </div>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Pedido original</th>
+            <th>Producto cotizado</th>
+            <th>Cant.</th>
+            <th style="text-align:right">Precio unit.</th>
+            <th style="text-align:right">Subtotal</th>
+            <th>Match</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    items.forEach((it, i) => {
+      total += (it.subtotal || 0);
+      const bc = it.confianza === 'alta' ? 'b-alta' : it.confianza === 'media' ? 'b-media' : 'b-baja';
+      const bl = it.confianza === 'alta' ? '● exacto' : it.confianza === 'media' ? '◐ similar' : '○ revisar';
+      const showConfirm = it.confianza !== 'alta';
+
+      html += `
+        <tr>
+          <td class="td-pedido">${it.pedido}</td>
+          <td class="td-match">
+            ${it.match}
+            ${it.nota ? `<div class="td-note">${it.nota}</div>` : ''}
+          </td>
+          <td>${it.cantidad} ${it.unidad || ''}</td>
+          <td class="td-precio">$${Number(it.precio_unit || 0).toLocaleString('es-AR')}</td>
+          <td class="td-precio">$${Number(it.subtotal || 0).toLocaleString('es-AR')}</td>
+          <td>
+            <span class="badge ${bc}">${bl}</span>
+            ${showConfirm ? `<br><button class="confirm-btn" id="confirm-${i}" onclick="confirmarSinonimo(${i}, this)">✓ confirmar</button>` : ''}
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+      </table>
+      </div>
+      <div class="total-bar">
+        <span class="total-label">Total estimado</span>
+        <span class="total-val">$${total.toLocaleString('es-AR')}</span>
+      </div>
+    `;
+
+    card.innerHTML = html;
+  }
+
+  // ─── Confirmar sinónimo ───────────────────────────────────
+  function confirmarSinonimo(i, btn) {
+    const item = resultItems[i];
+    // Extraer la primera palabra del pedido como sinónimo
+    const palabraPedido = item.pedido.split(' ')[0].toLowerCase().replace(/[^a-záéíóúñ]/gi, '');
+    const palabraMatch = item.match.split(' ')[0].toLowerCase().replace(/[^a-záéíóúñ]/gi, '');
+
+    if (palabraPedido && palabraMatch && palabraPedido !== palabraMatch) {
+      addSyn(palabraPedido, palabraMatch);
+    }
+
+    btn.textContent = '✓ guardado';
+    btn.classList.add('confirmed');
+    btn.disabled = true;
+  }
+
+  // ─── Descargar Excel ──────────────────────────────────────
+  function descargar() {
+    const rows = resultItems.map(it => ({
+      'Pedido original': it.pedido,
+      'Código': it.codigo || '',
+      'Producto cotizado': it.match,
+      'Cantidad': it.cantidad,
+      'Unidad': it.unidad || '',
+      'Precio unitario': it.precio_unit,
+      'Subtotal': it.subtotal,
+      'Confianza': it.confianza,
+      'Nota': it.nota || ''
+    }));
+
+    const total = resultItems.reduce((s, i) => s + (i.subtotal || 0), 0);
+    rows.push({
+      'Pedido original': '', 'Código': '', 'Producto cotizado': 'TOTAL',
+      'Cantidad': '', 'Unidad': '', 'Precio unitario': '', 'Subtotal': total,
+      'Confianza': '', 'Nota': ''
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Ancho de columnas
+    ws['!cols'] = [
+      { wch: 30 }, { wch: 10 }, { wch: 40 }, { wch: 8 },
+      { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 30 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Cotizacion');
+
+    const fecha = new Date().toLocaleDateString('es-AR').replace(/\//g, '-');
+    XLSX.writeFile(wb, `cotizacion_${fecha}.xlsx`);
+  }
+
+  // ─── Status ───────────────────────────────────────────────
+  function setStatus(msg, loading) {
+    const el = document.getElementById('status');
+    if (!msg) { el.style.display = 'none'; return; }
+    el.style.display = 'flex';
+    el.innerHTML = loading
+      ? `<div class="spinner"></div> ${msg}`
+      : msg;
+  }
+</script>
+
+</body>
+</html>
